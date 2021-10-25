@@ -254,8 +254,9 @@ def sites_callback_handler(callback_query):
             file = open(f'{text}.csv', 'rb')
             bot.send_document(message.chat.id, file)
             update_state(message, START)
-        except:
+        except Exception as e:
             update_state(message, current_state)
+            bot.send_message(message.chat.id, text=e)
             bot.send_message(message.chat.id, text='This parser is not implemented. Try another one')
             bot.send_message(message.chat.id, text='Choose site to parse', reply_markup=create_sites_keyboard())
     elif current_state == PARSING_IN_PROGRESS:
