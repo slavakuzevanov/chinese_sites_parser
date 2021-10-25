@@ -248,7 +248,7 @@ def sites_callback_handler(callback_query):
             update_state(message, PARSING_IN_PROGRESS)
             parser = SITES_PARSERS[text]
             current_key_words = list_current_key_words(message)
-            bot.send_message(message.chat.id, 'Parsing is in progress. This can take up to 15 minutes. '
+            bot.send_message(message.chat.id, 'Parsing is in progress. This can take some time. Please, be patient. '
                                               'I will send you a csv file')
             parser.run(create_r_search_string([row[0] for row in current_key_words]))
             file = open(f'{text}.csv', 'rb')
