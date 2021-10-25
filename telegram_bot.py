@@ -15,8 +15,8 @@ START, WORDS, PARSER_CHOOSE, PARSING_IN_PROGRESS = range(4)
 DELETE_KEY_WORDS = 100
 VIEW_KEY_WORDS = 101
 
-SITES_PARSERS = {'China Aerospace Science and Technology Corporation': SpaceChinaParser(),
-                 'Spaceflights fans': 'Not implemented', '10jqka': jqkaParser()}
+SITES_PARSERS = {'China Aerospace Science and Technology Corporation': SpaceChinaParser,
+                 'Spaceflights fans': 'Not implemented', '10jqka': jqkaParser}
 OPTION_BUTTONS = {'ADD NEW KEY WORD': WORDS, 'CHOOSE SITE TO PARSE': PARSER_CHOOSE,
                   'VIEW KEY WORDS': VIEW_KEY_WORDS, 'DELETE ALL KEY WORDS': DELETE_KEY_WORDS}
 
@@ -246,7 +246,7 @@ def sites_callback_handler(callback_query):
     if current_state == PARSER_CHOOSE:
         try:
             update_state(message, PARSING_IN_PROGRESS)
-            parser = SITES_PARSERS[text]
+            parser = SITES_PARSERS[text](bot, message.chat.id)
             current_key_words = list_current_key_words(message)
             bot.send_message(message.chat.id, 'Parsing is in progress. This can take some time. Please, be patient. '
                                               'I will send you a csv file')
@@ -256,7 +256,7 @@ def sites_callback_handler(callback_query):
             update_state(message, START)
         except Exception as e:
             update_state(message, current_state)
-            #bot.send_message(message.chat.id, text=e)
+            bot.send_message(message.chat.id, text=e)
             bot.send_message(message.chat.id, text='This parser is not implemented. Try another one')
             bot.send_message(message.chat.id, text='Choose site to parse', reply_markup=create_sites_keyboard())
     elif current_state == PARSING_IN_PROGRESS:

@@ -16,7 +16,7 @@ proxy_list = ['http://20.81.106.180:8888', 'http://202.73.51.234:80', 'http://51
 
 
 class SpaceChinaParser:
-    def __init__(self):
+    def __init__(self, bot, chat_id):
         self.URL = 'http://www.spacechina.com/n25/index.html'
 
         self.HEADERS = {
@@ -27,6 +27,9 @@ class SpaceChinaParser:
         self.SECTIONS_DICT = dict()
         self.SECTIONS_DICT_W_KEY_WORDS = dict()
         self.ARTICLES_URLS = []
+
+        self.bot = bot
+        self.chat_id = chat_id
 
     def __create_full_link(self, start_url, list_of_links):
         return [urllib.parse.urljoin(start_url, link) for link in list_of_links]
@@ -150,7 +153,7 @@ class SpaceChinaParser:
 
 
 class jqkaParser:
-    def __init__(self):
+    def __init__(self, bot, chat_id):
         self.list_of_section_urls = ['http://yuanchuang.10jqka.com.cn/ycall_list/',
                                 'http://invest.10jqka.com.cn/lczx_list/',
                                 'http://news.10jqka.com.cn/today_list/',
@@ -190,6 +193,9 @@ class jqkaParser:
         self.SECTIONS_DICT_W_KEY_WORDS = dict()
         self.ARTICLES_URLS = []
 
+        self.bot = bot
+        self.chat_id = chat_id
+
     def __create_full_link(self, start_url, list_of_links):
         return [urllib.parse.urljoin(start_url, link) for link in list_of_links]
 
@@ -199,10 +205,12 @@ class jqkaParser:
             async with session.get(url, headers=headers, proxy=proxy) as response:
                 response_text = await response.text()
                 print(url, f'with proxy {proxy} ', 'Access granted')
+                self.bot.send_message(self.chat_id, f"{url} with proxy {proxy} Access granted")
                 soup = BeautifulSoup(response_text, 'lxml')
                 return soup
         except:
             print(url, f'with proxy {proxy} ', 'Access denied')
+            self.bot.send_message(self.chat_id, f"{url} with proxy {proxy} Access denied")
             return BeautifulSoup('', 'lxml')
 
     async def __get_pages_for_section(self, section_url, session, headers):
@@ -247,11 +255,14 @@ class jqkaParser:
             async with session.get(article, headers=self.HEADERS, proxy=proxy) as resp:
                 resp_text = await resp.text()
                 print(article, f'with proxy {proxy} ', 'Access granted')
+                self.bot.send_message(self.chat_id, f"{article} with proxy {proxy} Access granted")
                 if re.search(key_words_string, resp_text):
                     print(f'found key words in {article}')
+                    self.bot.send_message(self.chat_id, f"found key words in {article}")
                     self.ARTICLES_URLS.append(article)
         except:
             print(article, f'with proxy {proxy} ', 'Access denied')
+            self.bot.send_message(self.chat_id, f"{article} with proxy {proxy} Access denied")
 
     async def __load_articles_with_key_words(self, sections, key_words_string):
         async with aiohttp.ClientSession() as session:
