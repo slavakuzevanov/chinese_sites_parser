@@ -7,6 +7,9 @@ import aiohttp
 import time
 import pandas as pd
 import random
+from fake_useragent import UserAgent
+
+ua = UserAgent()
 
 proxy_list = ['http://20.81.106.180:8888', 'http://202.73.51.234:80', 'http://51.195.201.93:80',
               'http://103.152.35.245:80', 'http://104.233.204.77:82', 'http://104.233.204.73:82',
@@ -59,7 +62,8 @@ class SpaceChinaParser:
         async with aiohttp.ClientSession() as session:
             tasks = []
             for section_url in sections:
-                task = asyncio.create_task(self.__get_pages_for_section(section_url, session, self.HEADERS))
+                task = asyncio.create_task(self.__get_pages_for_section(section_url, session,
+                                                                        {'User-Agent': str(ua.random)}))
                 tasks.append(task)
             await asyncio.gather(*tasks)
 
@@ -79,7 +83,8 @@ class SpaceChinaParser:
             tasks = []
             for section_url in sections:
                 task = asyncio.create_task(
-                    self.__get_articles_from_first_page_in_section(section_url, session, self.HEADERS))
+                    self.__get_articles_from_first_page_in_section(section_url, session,
+                                                                   {'User-Agent': str(ua.random)}))
                 tasks.append(task)
             await asyncio.gather(*tasks)
 
@@ -96,14 +101,15 @@ class SpaceChinaParser:
             for section_url in sections:
                 for page_link in self.SECTIONS_PAGES_DICT[section_url]:
                     task = asyncio.create_task(
-                        self.__get_articles_for_page_in_section(page_link, section_url, session, self.HEADERS))
+                        self.__get_articles_for_page_in_section(page_link, section_url, session,
+                                                                {'User-Agent': str(ua.random)}))
                     tasks.append(task)
             await asyncio.gather(*tasks)
 
     async def __find_article_with_key_words(self, session, section, article, key_words_string):
         print(article)
         try:
-            async with session.get(article, headers=self.HEADERS) as resp:
+            async with session.get(article, headers={'User-Agent': str(ua.random)}) as resp:
                 resp_text = await resp.text()
                 if re.search(key_words_string, resp_text):
                     print(f'found key words in {article}')
@@ -204,19 +210,22 @@ class jqkaParser:
         try:
             async with session.get(url, headers=headers, proxy=proxy) as response:
                 response_text = await response.text()
-                print(url, f'with proxy {proxy} ', 'Access granted')
-                self.bot.send_message(self.chat_id, f"{url} with proxy {proxy} Access granted")
+                print(url, 'OK')
+                print(response_text)
+                #self.bot.send_message(self.chat_id, f"{url} with proxy {proxy} Access granted")
                 soup = BeautifulSoup(response_text, 'lxml')
                 return soup
-        except:
-            print(url, f'with proxy {proxy} ', 'Access denied')
-            self.bot.send_message(self.chat_id, f"{url} with proxy {proxy} Access denied")
+        except Exception as e:
+            print('1', e)
+            print(url, 'ERROR')
+            #self.bot.send_message(self.chat_id, f"{url} with proxy {proxy} Access denied")
             return BeautifulSoup('', 'lxml')
 
     async def __get_pages_for_section(self, section_url, session, headers):
         section_soup = await self.__get_soup_by_url(section_url, session, headers)
         try:
             last_page_index = int(section_soup.find('a', {"class": "end"}).string)
+            print(f'{section_url}: {last_page_index}')
             pages_links_for_section = [f'{section_url}index_{index}.shtml' for index in range(1, last_page_index+1)]
         except:
             pages_links_for_section = []
@@ -228,7 +237,8 @@ class jqkaParser:
         async with aiohttp.ClientSession() as session:
             tasks = []
             for section_url in sections:
-                task = asyncio.create_task(self.__get_pages_for_section(section_url, session, self.HEADERS))
+                task = asyncio.create_task(self.__get_pages_for_section(section_url, session,
+                                                                        {'User-Agent': str(ua.random)}))
                 tasks.append(task)
             await asyncio.gather(*tasks)
 
@@ -245,24 +255,27 @@ class jqkaParser:
             for section_url in sections:
                 for page_link in self.SECTIONS_PAGES_DICT[section_url]:
                     task = asyncio.create_task(
-                        self.__get_articles_for_page_in_section(page_link, section_url, session, self.HEADERS))
+                        self.__get_articles_for_page_in_section(page_link, section_url, session,
+                                                                {'User-Agent': str(ua.random)}))
                     tasks.append(task)
             await asyncio.gather(*tasks)
 
     async def __find_article_with_key_words(self, session, section, article, key_words_string):
         proxy = random.choice(proxy_list)
         try:
-            async with session.get(article, headers=self.HEADERS, proxy=proxy) as resp:
-                resp_text = await resp.text()
-                print(article, f'with proxy {proxy} ', 'Access granted')
-                self.bot.send_message(self.chat_id, f"{article} with proxy {proxy} Access granted")
+            async with session.get(article, headers={'User-Agent': str(ua.random)}, proxy=proxy) as resp:
+                resp_text = await resp.text('gbk')
+                print(article, 'OK')
+                print(resp_text)
+                #self.bot.send_message(self.chat_id, f"{article} with proxy {proxy} Access granted")
                 if re.search(key_words_string, resp_text):
                     print(f'found key words in {article}')
-                    self.bot.send_message(self.chat_id, f"found key words in {article}")
+                    #self.bot.send_message(self.chat_id, f"found key words in {article}")
                     self.ARTICLES_URLS.append(article)
-        except:
-            print(article, f'with proxy {proxy} ', 'Access denied')
-            self.bot.send_message(self.chat_id, f"{article} with proxy {proxy} Access denied")
+        except Exception as e:
+            print('2', e)
+            print(article, 'ERROR')
+            #self.bot.send_message(self.chat_id, f"{article} with proxy {proxy} Access denied")
 
     async def __load_articles_with_key_words(self, sections, key_words_string):
         async with aiohttp.ClientSession() as session:
@@ -285,7 +298,9 @@ class jqkaParser:
 
             start_time = time.time()
             asyncio.run(self.__load_pages_for_sections(self.list_of_section_urls))
+            print('//////////////////////////////////////////////////////////////////////////')
             asyncio.run(self.__load_articles_for_sections(self.list_of_section_urls))
+            print('|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||')
             asyncio.run(self.__load_articles_with_key_words(self.list_of_section_urls, key_words_string))
 
             pd.DataFrame(self.ARTICLES_URLS, columns=['url']).to_csv(
