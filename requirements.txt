@@ -7,4 +7,5 @@ pandas~=1.3.0
 pyTelegramBotAPI==4.1.1
 lxml==4.6.3
 urllib3==1.26.6
+fake-useragent==0.1.11
 
