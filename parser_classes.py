@@ -210,15 +210,11 @@ class jqkaParser:
         try:
             async with session.get(url, headers=headers, proxy=proxy) as response:
                 response_text = await response.text()
-                print(url, 'OK')
-                print(response_text)
-                #self.bot.send_message(self.chat_id, f"{url} with proxy {proxy} Access granted")
+                print(url, 'OK 1')
                 soup = BeautifulSoup(response_text, 'lxml')
                 return soup
         except Exception as e:
-            print('1', e)
-            print(url, 'ERROR')
-            #self.bot.send_message(self.chat_id, f"{url} with proxy {proxy} Access denied")
+            print(url, 'ERROR 1')
             return BeautifulSoup('', 'lxml')
 
     async def __get_pages_for_section(self, section_url, session, headers):
@@ -264,18 +260,13 @@ class jqkaParser:
         proxy = random.choice(proxy_list)
         try:
             async with session.get(article, headers={'User-Agent': str(ua.random)}, proxy=proxy) as resp:
-                resp_text = await resp.text('gbk')
-                print(article, 'OK')
-                print(resp_text)
-                #self.bot.send_message(self.chat_id, f"{article} with proxy {proxy} Access granted")
+                resp_text = await resp.text()
+                print(article, 'OK 2')
                 if re.search(key_words_string, resp_text):
                     print(f'found key words in {article}')
-                    #self.bot.send_message(self.chat_id, f"found key words in {article}")
                     self.ARTICLES_URLS.append(article)
         except Exception as e:
-            print('2', e)
-            print(article, 'ERROR')
-            #self.bot.send_message(self.chat_id, f"{article} with proxy {proxy} Access denied")
+            print(article, 'ERROR 2')
 
     async def __load_articles_with_key_words(self, sections, key_words_string):
         async with aiohttp.ClientSession() as session:
