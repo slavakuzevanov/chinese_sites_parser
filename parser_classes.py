@@ -239,7 +239,7 @@ class jqkaParser:
     async def __load_pages_for_sections(self, sections):
         async with aiohttp.ClientSession() as session:
             tasks = []
-            semaphore = asyncio.BoundedSemaphore(120)
+            semaphore = asyncio.BoundedSemaphore(600)
             for section_url in sections:
                 task = asyncio.create_task(self.__get_pages_for_section(section_url, session,
                                                                         {'User-Agent': str(ua.random)}, semaphore))
@@ -257,7 +257,7 @@ class jqkaParser:
     async def __load_articles_for_sections(self, sections):
         async with aiohttp.ClientSession() as session:
             tasks = []
-            semaphore = asyncio.BoundedSemaphore(120)
+            semaphore = asyncio.BoundedSemaphore(600)
             for section_url in sections:
                 for page_link in self.SECTIONS_PAGES_DICT[section_url]:
                     task = asyncio.create_task(
@@ -282,7 +282,7 @@ class jqkaParser:
     async def __load_articles_with_key_words(self, sections, key_words_string):
         async with aiohttp.ClientSession() as session:
             tasks = []
-            semaphore = asyncio.BoundedSemaphore(120)
+            semaphore = asyncio.BoundedSemaphore(60)
             for section in sections:
                 for article in self.SECTIONS_DICT[section]:
                     task = asyncio.create_task(
