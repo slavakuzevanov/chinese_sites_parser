@@ -169,7 +169,6 @@ class jqkaParser:
         self.list_of_section_urls = ['http://yuanchuang.10jqka.com.cn/ycall_list/',
                                 'http://invest.10jqka.com.cn/lczx_list/',
                                 'http://news.10jqka.com.cn/today_list/',
-                                'http://stock.10jqka.com.cn/companynews_list/',
                                 'http://stock.10jqka.com.cn/hks/ggdt_list/',
                                 'http://news.10jqka.com.cn/guojicj_list/',
                                 'http://yuanchuang.10jqka.com.cn/djsjdp_list/',
