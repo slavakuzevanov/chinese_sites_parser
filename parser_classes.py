@@ -46,45 +46,49 @@ class SpaceChinaParser:
         except:
             return BeautifulSoup('', 'lxml')
 
-    async def __get_pages_for_section(self, section_url, session, headers):
-        section_soup = await self.__get_soup_by_url(section_url, session, headers)
-        pages_links_for_section_soup = section_soup.find('div', style='display:none')
-        try:
-            pages_links_for_section = [tag['href'] for tag in pages_links_for_section_soup.find_all('a')]
-        except:
-            pages_links_for_section = []
-        full_pages_links_for_section = self.__create_full_link(section_url, pages_links_for_section)
-        print(section_url)
-        self.SECTIONS_PAGES_DICT[section_url] = full_pages_links_for_section
+    async def __get_pages_for_section(self, section_url, session, headers, semaphore):
+        async with semaphore:
+            section_soup = await self.__get_soup_by_url(section_url, session, headers)
+            pages_links_for_section_soup = section_soup.find('div', style='display:none')
+            try:
+                pages_links_for_section = [tag['href'] for tag in pages_links_for_section_soup.find_all('a')]
+            except:
+                pages_links_for_section = []
+            full_pages_links_for_section = self.__create_full_link(section_url, pages_links_for_section)
+            print(section_url)
+            self.SECTIONS_PAGES_DICT[section_url] = full_pages_links_for_section
         return full_pages_links_for_section
 
     async def __load_pages_for_sections(self, sections):
         async with aiohttp.ClientSession() as session:
             tasks = []
+            semaphore = asyncio.BoundedSemaphore(600)
             for section_url in sections:
                 task = asyncio.create_task(self.__get_pages_for_section(section_url, session,
-                                                                        {'User-Agent': str(ua.random)}))
+                                                                        {'User-Agent': str(ua.random)}, semaphore))
                 tasks.append(task)
             await asyncio.gather(*tasks)
 
-    async def __get_articles_from_first_page_in_section(self, section_url, session, headers):
-        section_soup = await self.__get_soup_by_url(section_url, session, headers)
-        first_page_article_links_for_section_soup = section_soup.find('div', class_='olist_box_r').find('span')
-        first_page_article_links_for_section = [tag['href'] for tag in
-                                                first_page_article_links_for_section_soup.find_all('a')]
-        full_first_page_article_links_for_section = self.__create_full_link(section_url,
-                                                                            first_page_article_links_for_section)
-        self.SECTIONS_DICT[section_url] = self.SECTIONS_DICT[section_url].union(
-            full_first_page_article_links_for_section)
+    async def __get_articles_from_first_page_in_section(self, section_url, session, headers, semaphore):
+        async with semaphore:
+            section_soup = await self.__get_soup_by_url(section_url, session, headers)
+            first_page_article_links_for_section_soup = section_soup.find('div', class_='olist_box_r').find('span')
+            first_page_article_links_for_section = [tag['href'] for tag in
+                                                    first_page_article_links_for_section_soup.find_all('a')]
+            full_first_page_article_links_for_section = self.__create_full_link(section_url,
+                                                                                first_page_article_links_for_section)
+            self.SECTIONS_DICT[section_url] = self.SECTIONS_DICT[section_url].union(
+                full_first_page_article_links_for_section)
         return full_first_page_article_links_for_section
 
     async def __load_articles_from_first_page_in_sections(self, sections):
         async with aiohttp.ClientSession() as session:
             tasks = []
+            semaphore = asyncio.BoundedSemaphore(600)
             for section_url in sections:
                 task = asyncio.create_task(
                     self.__get_articles_from_first_page_in_section(section_url, session,
-                                                                   {'User-Agent': str(ua.random)}))
+                                                                   {'User-Agent': str(ua.random)}, semaphore))
                 tasks.append(task)
             await asyncio.gather(*tasks)
 
@@ -106,24 +110,26 @@ class SpaceChinaParser:
                     tasks.append(task)
             await asyncio.gather(*tasks)
 
-    async def __find_article_with_key_words(self, session, section, article, key_words_string):
-        print(article)
-        try:
-            async with session.get(article, headers={'User-Agent': str(ua.random)}) as resp:
-                resp_text = await resp.text()
-                if re.search(key_words_string, resp_text):
-                    print(f'found key words in {article}')
-                    self.ARTICLES_URLS.append(article)
-        except:
-            pass
+    async def __find_article_with_key_words(self, session, section, article, key_words_string, semaphore):
+        async with semaphore:
+            print(article)
+            try:
+                async with session.get(article, headers={'User-Agent': str(ua.random)}) as resp:
+                    resp_text = await resp.text()
+                    if re.search(key_words_string, resp_text):
+                        print(f'found key words in {article}')
+                        self.ARTICLES_URLS.append(article)
+            except:
+                pass
 
     async def __load_articles_with_key_words(self, sections, key_words_string):
         async with aiohttp.ClientSession() as session:
             tasks = []
+            semaphore = asyncio.BoundedSemaphore(600)
             for section in sections:
                 for article in self.SECTIONS_DICT[section]:
                     task = asyncio.create_task(
-                        self.__find_article_with_key_words(session, section, article, key_words_string))
+                        self.__find_article_with_key_words(session, section, article, key_words_string, semaphore))
                     tasks.append(task)
             await asyncio.gather(*tasks)
 
@@ -151,7 +157,7 @@ class SpaceChinaParser:
             asyncio.run(self.__load_articles_for_sections(all_sections_links))
             asyncio.run(self.__load_articles_with_key_words(all_sections_links, key_words_string))
 
-            pd.DataFrame(self.ARTICLES_URLS, columns=['url']).to_csv(
+            pd.DataFrame(self.ARTICLES_URLS, columns=['url']).drop_duplicates().to_csv(
                 'China Aerospace Science and Technology Corporation.csv',
                 index=False)
             end_time = time.time() - start_time
@@ -217,64 +223,70 @@ class jqkaParser:
             print(url, 'ERROR 1')
             return BeautifulSoup('', 'lxml')
 
-    async def __get_pages_for_section(self, section_url, session, headers):
-        section_soup = await self.__get_soup_by_url(section_url, session, headers)
-        try:
-            last_page_index = int(section_soup.find('a', {"class": "end"}).string)
-            print(f'{section_url}: {last_page_index}')
-            pages_links_for_section = [f'{section_url}index_{index}.shtml' for index in range(1, last_page_index+1)]
-        except:
-            pages_links_for_section = []
-        full_pages_links_for_section = self.__create_full_link(section_url, pages_links_for_section)
-        self.SECTIONS_PAGES_DICT[section_url] = full_pages_links_for_section
+    async def __get_pages_for_section(self, section_url, session, headers, semaphore):
+        async with semaphore:
+            section_soup = await self.__get_soup_by_url(section_url, session, headers)
+            try:
+                last_page_index = int(section_soup.find('a', {"class": "end"}).string)
+                print(f'{section_url}: {last_page_index}')
+                pages_links_for_section = [f'{section_url}index_{index}.shtml' for index in range(1, last_page_index+1)]
+            except:
+                pages_links_for_section = []
+            full_pages_links_for_section = self.__create_full_link(section_url, pages_links_for_section)
+            self.SECTIONS_PAGES_DICT[section_url] = full_pages_links_for_section
         return full_pages_links_for_section
 
     async def __load_pages_for_sections(self, sections):
         async with aiohttp.ClientSession() as session:
             tasks = []
+            semaphore = asyncio.BoundedSemaphore(120)
             for section_url in sections:
                 task = asyncio.create_task(self.__get_pages_for_section(section_url, session,
-                                                                        {'User-Agent': str(ua.random)}))
+                                                                        {'User-Agent': str(ua.random)}, semaphore))
                 tasks.append(task)
             await asyncio.gather(*tasks)
 
-    async def __get_articles_for_page_in_section(self, page_link, section_url, session, headers):
-        page_soup = await self.__get_soup_by_url(page_link, session, headers)
-        page_article_links = [tag['href'] for tag in page_soup.find_all('a', {"class": "arc-cont"})]
-        full_page_article_links = self.__create_full_link(page_link, page_article_links)
-        self.SECTIONS_DICT[section_url] = self.SECTIONS_DICT[section_url].union(full_page_article_links)
+    async def __get_articles_for_page_in_section(self, page_link, section_url, session, headers, semaphore):
+        async with semaphore:
+            page_soup = await self.__get_soup_by_url(page_link, session, headers)
+            page_article_links = [tag['href'] for tag in page_soup.find_all('a', {"class": "arc-cont"})]
+            full_page_article_links = self.__create_full_link(page_link, page_article_links)
+            self.SECTIONS_DICT[section_url] = self.SECTIONS_DICT[section_url].union(full_page_article_links)
         return full_page_article_links
 
     async def __load_articles_for_sections(self, sections):
         async with aiohttp.ClientSession() as session:
             tasks = []
+            semaphore = asyncio.BoundedSemaphore(120)
             for section_url in sections:
                 for page_link in self.SECTIONS_PAGES_DICT[section_url]:
                     task = asyncio.create_task(
                         self.__get_articles_for_page_in_section(page_link, section_url, session,
-                                                                {'User-Agent': str(ua.random)}))
+                                                                {'User-Agent': str(ua.random)}, semaphore))
                     tasks.append(task)
             await asyncio.gather(*tasks)
 
-    async def __find_article_with_key_words(self, session, section, article, key_words_string):
-        proxy = random.choice(proxy_list)
-        try:
-            async with session.get(article, headers={'User-Agent': str(ua.random)}, proxy=proxy) as resp:
-                resp_text = await resp.text()
-                print(article, 'OK 2')
-                if re.search(key_words_string, resp_text):
-                    print(f'found key words in {article}')
-                    self.ARTICLES_URLS.append(article)
-        except Exception as e:
-            print(article, 'ERROR 2')
+    async def __find_article_with_key_words(self, session, section, article, key_words_string, semaphore):
+        async with semaphore:
+            proxy = random.choice(proxy_list)
+            try:
+                async with session.get(article, headers={'User-Agent': str(ua.random)}, proxy=proxy) as resp:
+                    resp_text = await resp.text()
+                    print(article, 'OK 2')
+                    if re.search(key_words_string, resp_text):
+                        print(f'found key words in {article}')
+                        self.ARTICLES_URLS.append(article)
+            except:
+                print(article, 'ERROR 2')
 
     async def __load_articles_with_key_words(self, sections, key_words_string):
         async with aiohttp.ClientSession() as session:
             tasks = []
+            semaphore = asyncio.BoundedSemaphore(120)
             for section in sections:
                 for article in self.SECTIONS_DICT[section]:
                     task = asyncio.create_task(
-                        self.__find_article_with_key_words(session, section, article, key_words_string))
+                        self.__find_article_with_key_words(session, section, article, key_words_string, semaphore))
                     tasks.append(task)
             await asyncio.gather(*tasks)
 
@@ -294,7 +306,7 @@ class jqkaParser:
             print('|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||')
             asyncio.run(self.__load_articles_with_key_words(self.list_of_section_urls, key_words_string))
 
-            pd.DataFrame(self.ARTICLES_URLS, columns=['url']).to_csv(
+            pd.DataFrame(self.ARTICLES_URLS, columns=['url']).drop_duplicates().to_csv(
                 '10jqka.csv',
                 index=False)
             end_time = time.time() - start_time

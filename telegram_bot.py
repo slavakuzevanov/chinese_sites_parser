@@ -4,6 +4,7 @@ import pymysql
 from collections import defaultdict
 from telebot import types
 from parser_classes import SpaceChinaParser, jqkaParser
+import os, psutil
 
 
 def create_r_search_string(list_of_key_words):
@@ -14,11 +15,13 @@ token = '2082431691:AAFI59UKTV-UAbKVNRc3ejMs-zVAvSpmoiQ'
 START, WORDS, PARSER_CHOOSE, PARSING_IN_PROGRESS = range(4)
 DELETE_KEY_WORDS = 100
 VIEW_KEY_WORDS = 101
+VIEW_MEMORY_USAGE = 102
 
 SITES_PARSERS = {'China Aerospace Science and Technology Corporation': SpaceChinaParser,
                  'Spaceflights fans': 'Not implemented', '10jqka': jqkaParser}
 OPTION_BUTTONS = {'ADD NEW KEY WORD': WORDS, 'CHOOSE SITE TO PARSE': PARSER_CHOOSE,
-                  'VIEW KEY WORDS': VIEW_KEY_WORDS, 'DELETE ALL KEY WORDS': DELETE_KEY_WORDS}
+                  'VIEW KEY WORDS': VIEW_KEY_WORDS, 'DELETE ALL KEY WORDS': DELETE_KEY_WORDS,
+                  'VIEW MEMORY USAGE': VIEW_MEMORY_USAGE}
 
 
 def create_r_search_string(list_of_key_words):
@@ -188,6 +191,9 @@ def options_callback_handler(callback_query):
     if current_state in [START, WORDS] and int(text) == WORDS:
         bot.send_message(message.chat.id, text='Write new key word')
         update_state(message, WORDS)
+    elif int(text) == VIEW_MEMORY_USAGE:
+        process = psutil.Process(os.getpid())
+        bot.send_message(message.chat.id, text=process.memory_info().rss)
     elif current_state in [START, WORDS, PARSER_CHOOSE] and int(text) == PARSER_CHOOSE:
         key_words = list_current_key_words(message)
         if len(key_words) == 0:
@@ -254,6 +260,7 @@ def sites_callback_handler(callback_query):
             file = open(f'{text}.csv', 'rb')
             bot.send_document(message.chat.id, file)
             update_state(message, START)
+            del parser
         except Exception as e:
             update_state(message, current_state)
             bot.send_message(message.chat.id, text=e)
