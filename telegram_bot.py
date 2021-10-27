@@ -1,10 +1,13 @@
-import telebot
 import datetime
-import pymysql
+import os
+import psutil
 from collections import defaultdict
+
+import pymysql
+import telebot
 from telebot import types
+
 from parser_classes import SpaceChinaParser, jqkaParser
-import os, psutil
 
 
 def create_r_search_string(list_of_key_words):
@@ -193,7 +196,7 @@ def options_callback_handler(callback_query):
         update_state(message, WORDS)
     elif int(text) == VIEW_MEMORY_USAGE:
         process = psutil.Process(os.getpid())
-        bot.send_message(message.chat.id, text=process.memory_info().rss)
+        bot.send_message(message.chat.id, text=f'{process.memory_info().rss/(1024**2)} MB')
     elif current_state in [START, WORDS, PARSER_CHOOSE] and int(text) == PARSER_CHOOSE:
         key_words = list_current_key_words(message)
         if len(key_words) == 0:
@@ -272,4 +275,5 @@ def sites_callback_handler(callback_query):
         bot.send_message(message.chat.id, text='Try CHOOSE SITE TO PARSE command first')
 
 
+bot.remove_webhook()
 bot.polling()
