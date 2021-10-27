@@ -20,7 +20,7 @@ proxy_list = ['http://20.81.106.180:8888', 'http://202.73.51.234:80', 'http://51
 
 
 class SpaceChinaParser:
-    def __init__(self, bot, chat_id):
+    def __init__(self):
         self.URL = 'http://www.spacechina.com/n25/index.html'
 
         self.HEADERS = {
@@ -31,9 +31,6 @@ class SpaceChinaParser:
         self.SECTIONS_DICT = dict()
         self.SECTIONS_DICT_W_KEY_WORDS = dict()
         self.ARTICLES_URLS = []
-
-        self.bot = bot
-        self.chat_id = chat_id
 
     def __create_full_link(self, start_url, list_of_links):
         return [urllib.parse.urljoin(start_url, link) for link in list_of_links]
@@ -57,7 +54,6 @@ class SpaceChinaParser:
         full_pages_links_for_section = self.__create_full_link(section_url, pages_links_for_section)
         print(section_url)
         self.SECTIONS_PAGES_DICT[section_url] = full_pages_links_for_section
-        return full_pages_links_for_section
 
     async def __load_pages_for_sections(self, sections):
         async with aiohttp.ClientSession() as session:
@@ -77,7 +73,7 @@ class SpaceChinaParser:
                                                                             first_page_article_links_for_section)
         self.SECTIONS_DICT[section_url] = self.SECTIONS_DICT[section_url].union(
             full_first_page_article_links_for_section)
-        return full_first_page_article_links_for_section
+
 
     async def __load_articles_from_first_page_in_sections(self, sections):
         async with aiohttp.ClientSession() as session:
@@ -94,7 +90,6 @@ class SpaceChinaParser:
         page_article_links = [tag['href'] for tag in page_soup.find_all('a')]
         full_page_article_links = self.__create_full_link(page_link, page_article_links)
         self.SECTIONS_DICT[section_url] = self.SECTIONS_DICT[section_url].union(full_page_article_links)
-        return full_page_article_links
 
     async def __load_articles_for_sections(self, sections):
         async with aiohttp.ClientSession() as session:
@@ -165,7 +160,7 @@ class SpaceChinaParser:
 
 
 class jqkaParser:
-    def __init__(self, bot, chat_id):
+    def __init__(self):
         self.list_of_section_urls = ['http://yuanchuang.10jqka.com.cn/ycall_list/',
                                 'http://invest.10jqka.com.cn/lczx_list/',
                                 'http://news.10jqka.com.cn/today_list/',
@@ -202,9 +197,6 @@ class jqkaParser:
         self.SECTIONS_DICT = dict()
         self.SECTIONS_DICT_W_KEY_WORDS = dict()
         self.ARTICLES_URLS = []
-
-        self.bot = bot
-        self.chat_id = chat_id
 
     def __create_full_link(self, start_url, list_of_links):
         return [urllib.parse.urljoin(start_url, link) for link in list_of_links]

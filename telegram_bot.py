@@ -1,8 +1,11 @@
+import gc
+import linecache
+import tracemalloc
 import datetime
 import os
 import psutil
 from collections import defaultdict
-
+from pympler import muppy
 import pymysql
 import telebot
 from telebot import types
@@ -10,11 +13,37 @@ from telebot import types
 from parser_classes import SpaceChinaParser, jqkaParser
 
 
+def display_top(snapshot, key_type='lineno', limit=10):
+    snapshot = snapshot.filter_traces((
+        tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
+        tracemalloc.Filter(False, "<unknown>"),
+    ))
+    top_stats = snapshot.statistics(key_type)
+
+    print("Top %s lines" % limit)
+    for index, stat in enumerate(top_stats[:limit], 1):
+        frame = stat.traceback[0]
+        print("#%s: %s:%s: %.1f KiB"
+              % (index, frame.filename, frame.lineno, stat.size / 1024))
+        line = linecache.getline(frame.filename, frame.lineno).strip()
+        if line:
+            print('    %s' % line)
+
+    other = top_stats[limit:]
+    if other:
+        size = sum(stat.size for stat in other)
+        print("%s other: %.1f KiB" % (len(other), size / 1024))
+    total = sum(stat.size for stat in top_stats)
+    print("Total allocated size: %.1f KiB" % (total / 1024))
+
+tracemalloc.start()
+
+
 def create_r_search_string(list_of_key_words):
     return r'|'.join(map(lambda x: f"({x})", list_of_key_words))
 
 
-token = '2082431691:AAFI59UKTV-UAbKVNRc3ejMs-zVAvSpmoiQ'
+token = '2082431691:AAFdurqPgFXTnFU-NprqxkcpAtbV-ZggU7U'
 START, WORDS, PARSER_CHOOSE, PARSING_IN_PROGRESS = range(4)
 DELETE_KEY_WORDS = 100
 VIEW_KEY_WORDS = 101
@@ -116,6 +145,9 @@ def list_current_key_words(message):
 
         cursor.execute(query, message.chat.id)
         key_words = cursor.fetchall()
+        cnx.commit()
+        cursor.close()
+        cnx.close()
 
         return key_words
     except:
@@ -196,7 +228,15 @@ def options_callback_handler(callback_query):
         update_state(message, WORDS)
     elif int(text) == VIEW_MEMORY_USAGE:
         process = psutil.Process(os.getpid())
-        bot.send_message(message.chat.id, text=f'{process.memory_info().rss/(1024**2)} MB')
+        current_snapshot = tracemalloc.take_snapshot()
+        top_stats = current_snapshot.compare_to(first_snapshot, 'lineno')
+        top_10 = ''
+        for stat in top_stats[:20]:
+            top_10 += str(stat) + '\n'
+        bot.send_message(message.chat.id, text=f'{process.memory_info().rss / (1024 ** 2)} MB')
+        bot.send_message(message.chat.id, text=f'''TOP10 \n{top_10}''')
+        print(display_top(current_snapshot, limit=20))
+
     elif current_state in [START, WORDS, PARSER_CHOOSE] and int(text) == PARSER_CHOOSE:
         key_words = list_current_key_words(message)
         if len(key_words) == 0:
@@ -255,18 +295,19 @@ def sites_callback_handler(callback_query):
     if current_state == PARSER_CHOOSE:
         try:
             update_state(message, PARSING_IN_PROGRESS)
-            parser = SITES_PARSERS[text](bot, message.chat.id)
+            parser = SITES_PARSERS[text]()
             current_key_words = list_current_key_words(message)
             bot.send_message(message.chat.id, 'Parsing is in progress. This can take some time. Please, be patient. '
                                               'I will send you a csv file')
             parser.run(create_r_search_string([row[0] for row in current_key_words]))
-            file = open(f'{text}.csv', 'rb')
-            bot.send_document(message.chat.id, file)
+            with open(f'{text}.csv', 'rb') as file:
+                bot.send_document(message.chat.id, file)
             update_state(message, START)
             del parser
+            gc.collect()
         except Exception as e:
             update_state(message, current_state)
-            bot.send_message(message.chat.id, text=e)
+            bot.send_message(message.chat.id, text=str(e))
             bot.send_message(message.chat.id, text='This parser is not implemented. Try another one')
             bot.send_message(message.chat.id, text='Choose site to parse', reply_markup=create_sites_keyboard())
     elif current_state == PARSING_IN_PROGRESS:
@@ -275,5 +316,6 @@ def sites_callback_handler(callback_query):
         bot.send_message(message.chat.id, text='Try CHOOSE SITE TO PARSE command first')
 
 
-bot.remove_webhook()
+first_snapshot = tracemalloc.take_snapshot()
+
 bot.polling()
