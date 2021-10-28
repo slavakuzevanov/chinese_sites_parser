@@ -333,9 +333,9 @@ def sites_callback_handler(callback_query):
             bot.send_message(message.chat.id, 'Parsing is in progress. This can take some time. Please, be patient. '
                                               'I will send you a csv file')
             parser.run(create_r_search_string([row[0] for row in current_key_words]))
-            with open(text+'_'+str(message.chat.id)+'.csv', 'rb') as file:
+            with open(f'{text}.csv', 'rb') as file:
                 bot.send_document(message.chat.id, file)
-                os.remove(text+'_'+str(message.chat.id)+'.csv')
+            os.remove(f'{text}.csv')
             update_state(message, START)
             del parser
             gc.collect()
