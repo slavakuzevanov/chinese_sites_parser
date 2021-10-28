@@ -4,8 +4,6 @@ import gc
 import datetime
 import os
 import psutil
-from collections import defaultdict
-from pympler import muppy
 import pymysql
 import telebot
 from telebot import types
