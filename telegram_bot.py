@@ -1,6 +1,6 @@
 import gc
-import linecache
-import tracemalloc
+#import linecache
+#import tracemalloc
 import datetime
 import os
 import psutil
@@ -13,30 +13,30 @@ from telebot import types
 from parser_classes import SpaceChinaParser, jqkaParser
 
 
-def display_top(snapshot, key_type='lineno', limit=10):
-    snapshot = snapshot.filter_traces((
-        tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
-        tracemalloc.Filter(False, "<unknown>"),
-    ))
-    top_stats = snapshot.statistics(key_type)
-
-    print("Top %s lines" % limit)
-    for index, stat in enumerate(top_stats[:limit], 1):
-        frame = stat.traceback[0]
-        print("#%s: %s:%s: %.1f KiB"
-              % (index, frame.filename, frame.lineno, stat.size / 1024))
-        line = linecache.getline(frame.filename, frame.lineno).strip()
-        if line:
-            print('    %s' % line)
-
-    other = top_stats[limit:]
-    if other:
-        size = sum(stat.size for stat in other)
-        print("%s other: %.1f KiB" % (len(other), size / 1024))
-    total = sum(stat.size for stat in top_stats)
-    print("Total allocated size: %.1f KiB" % (total / 1024))
-
-tracemalloc.start()
+# def display_top(snapshot, key_type='lineno', limit=10):
+#     snapshot = snapshot.filter_traces((
+#         tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
+#         tracemalloc.Filter(False, "<unknown>"),
+#     ))
+#     top_stats = snapshot.statistics(key_type)
+#
+#     print("Top %s lines" % limit)
+#     for index, stat in enumerate(top_stats[:limit], 1):
+#         frame = stat.traceback[0]
+#         print("#%s: %s:%s: %.1f KiB"
+#               % (index, frame.filename, frame.lineno, stat.size / 1024))
+#         line = linecache.getline(frame.filename, frame.lineno).strip()
+#         if line:
+#             print('    %s' % line)
+#
+#     other = top_stats[limit:]
+#     if other:
+#         size = sum(stat.size for stat in other)
+#         print("%s other: %.1f KiB" % (len(other), size / 1024))
+#     total = sum(stat.size for stat in top_stats)
+#     print("Total allocated size: %.1f KiB" % (total / 1024))
+#
+# tracemalloc.start()
 
 
 def create_r_search_string(list_of_key_words):
@@ -114,6 +114,41 @@ def update_state(message, state):
         pass
 
 
+def update_state_after_crash():
+    try:
+        cnx = pymysql.connect(user='bb5f1b503fb8af', password='cea159a5',
+                              host='eu-cdbr-west-01.cleardb.com',
+                              database='heroku_4aa2fecd059c356')
+        cursor = cnx.cursor()
+        query = "UPDATE user SET state = %s, change_date = %s"
+        values = (START, datetime.datetime.now())
+        cursor.execute(query, values)
+        cnx.commit()
+        cursor.close()
+        cnx.close()
+    except:
+        pass
+
+
+def get_users_chat_id_after_crash():
+    try:
+        cnx = pymysql.connect(user='bb5f1b503fb8af', password='cea159a5',
+                              host='eu-cdbr-west-01.cleardb.com',
+                              database='heroku_4aa2fecd059c356')
+        cursor = cnx.cursor()
+        query = "SELECT id from user where state = %s"
+        values = PARSING_IN_PROGRESS
+        cursor.execute(query, values)
+        results = cursor.fetchall()
+        users_id = [_[0] for _ in results]
+        cnx.commit()
+        cursor.close()
+        cnx.close()
+        return users_id
+    except:
+        pass
+
+
 def add_key_word_for_user(message, key_word: str):
     try:
         cnx = pymysql.connect(user='bb5f1b503fb8af', password='cea159a5',
@@ -170,7 +205,7 @@ def delete_users_key_words(message):
     cnx.close()
 
 
-USER_STATE = defaultdict(lambda: START)
+#USER_STATE = defaultdict(lambda: START)
 
 bot = telebot.TeleBot(token)
 
@@ -228,14 +263,14 @@ def options_callback_handler(callback_query):
         update_state(message, WORDS)
     elif int(text) == VIEW_MEMORY_USAGE:
         process = psutil.Process(os.getpid())
-        current_snapshot = tracemalloc.take_snapshot()
-        top_stats = current_snapshot.compare_to(first_snapshot, 'lineno')
-        top_10 = ''
-        for stat in top_stats[:20]:
-            top_10 += str(stat) + '\n'
+        #current_snapshot = tracemalloc.take_snapshot()
+        # top_stats = current_snapshot.compare_to(first_snapshot, 'lineno')
+        # top_10 = ''
+        # for stat in top_stats[:20]:
+        #     top_10 += str(stat) + '\n'
         bot.send_message(message.chat.id, text=f'{process.memory_info().rss / (1024 ** 2)} MB')
-        bot.send_message(message.chat.id, text=f'''TOP10 \n{top_10}''')
-        print(display_top(current_snapshot, limit=20))
+        # bot.send_message(message.chat.id, text=f'''TOP10 \n{top_10}''')
+        # print(display_top(current_snapshot, limit=20))
 
     elif current_state in [START, WORDS, PARSER_CHOOSE] and int(text) == PARSER_CHOOSE:
         key_words = list_current_key_words(message)
@@ -300,8 +335,9 @@ def sites_callback_handler(callback_query):
             bot.send_message(message.chat.id, 'Parsing is in progress. This can take some time. Please, be patient. '
                                               'I will send you a csv file')
             parser.run(create_r_search_string([row[0] for row in current_key_words]))
-            with open(f'{text}.csv', 'rb') as file:
+            with open(text+'_'+str(message.chat.id)+'.csv', 'rb') as file:
                 bot.send_document(message.chat.id, file)
+                os.remove(text+'_'+str(message.chat.id)+'.csv')
             update_state(message, START)
             del parser
             gc.collect()
@@ -316,6 +352,9 @@ def sites_callback_handler(callback_query):
         bot.send_message(message.chat.id, text='Try CHOOSE SITE TO PARSE command first')
 
 
-first_snapshot = tracemalloc.take_snapshot()
-
+#first_snapshot = tracemalloc.take_snapshot()
+user_id_after_crash = get_users_chat_id_after_crash()
+for chat_id in user_id_after_crash:
+    bot.send_message(chat_id, text='We are sorry. We had to restart the bot. Try running your parser again.')
+update_state_after_crash()
 bot.polling()
