@@ -300,3 +300,95 @@ class jqkaParser:
             del self.SECTIONS_DICT, self.SECTIONS_DICT_W_KEY_WORDS, self.ARTICLES_URLS
             gc.collect()
             print(f'Execution time: {end_time} seconds')
+
+
+class SpaceFlightsFansParser:
+    def __init__(self):
+        self.article_links = set()
+        self.pages_links = []
+        self.ARTICLES_URLS_W_KEY_WORDS = []
+        self.URL = 'https://www.spaceflightfans.cn/'
+
+    def __create_full_link(self, start_url, list_of_links):
+        return [urllib.parse.urljoin(start_url, link) for link in list_of_links]
+
+    async def __get_soup_by_url(self, url, session, headers):
+        try:
+            async with session.get(url, headers=headers) as response:
+                response_text = await response.text()
+                print(url, 'OK 1')
+                soup = BeautifulSoup(response_text, 'lxml')
+                return soup
+        except Exception as e:
+            print(url, 'ERROR 1')
+            return BeautifulSoup('', 'lxml')
+
+    async def __get_articles_for_page(self, page_link, session, headers):
+        page_soup = await self.__get_soup_by_url(page_link, session, headers)
+        page_articles = page_soup.find_all('article')
+        page_article_links = [article.find('a')['href'] for article in page_articles]
+        page_article_links = self.__create_full_link(page_link, page_article_links)
+        self.article_links = self.article_links.union(page_article_links)
+        return page_article_links
+
+    async def __load_articles_for_pages(self):
+        async with aiohttp.ClientSession() as session:
+            tasks = []
+            for page_link in self.pages_links:
+                task = asyncio.create_task(
+                    self.__get_articles_for_page(page_link, session, {'User-Agent': str(ua.random)}))
+                tasks.append(task)
+            await asyncio.gather(*tasks)
+
+    async def __find_article_with_key_words(self, session, article, key_words_string):
+        try:
+            async with session.get(article, headers={'User-Agent': str(ua.random)}) as resp:
+                resp_text = await resp.text()
+                print(article, 'OK 2')
+                if re.search(key_words_string, resp_text):
+                    print(f'found key words in {article}')
+                    self.ARTICLES_URLS_W_KEY_WORDS.append(article)
+        except:
+            print(article, 'ERROR 2')
+
+    async def __load_articles_with_key_words(self, key_words_string):
+        async with aiohttp.ClientSession() as session:
+            tasks = []
+            for article in self.article_links:
+                task = asyncio.create_task(
+                    self.__find_article_with_key_words(session, article, key_words_string))
+                tasks.append(task)
+            await asyncio.gather(*tasks)
+
+    def run(self, key_words_string):
+
+        with requests.Session() as s:
+            # Получаю разметку главной страницы
+            main_page = s.get(self.URL, headers={'User-Agent': str(ua.random)})
+            main_page.encoding = main_page.apparent_encoding
+            main_page_soup = BeautifulSoup(main_page.text, 'lxml')
+            del main_page
+
+            # Получаю цифру последней страницы
+            last_page = main_page_soup.find('a', attrs={"class": "page-numbers"}).string
+            all_sections_links = [f'https://www.spaceflightfans.cn/index.php/page/{i}/' for i
+                                  in range(1, int(last_page) + 1)]
+            self.pages_links = self.__create_full_link(self.URL, all_sections_links)
+            del main_page_soup, last_page
+
+            start_time = time.time()
+            #asyncio.run(self.__load_articles_for_pages())
+            asyncio.get_event_loop().run_until_complete(self.__load_articles_for_pages())
+            del self.pages_links
+            gc.collect()
+            print('|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||')
+            #asyncio.run(self.__load_articles_with_key_words(key_words_string))
+            asyncio.get_event_loop().run_until_complete(self.__load_articles_with_key_words(key_words_string))
+
+            pd.DataFrame(self.ARTICLES_URLS_W_KEY_WORDS, columns=['url']).drop_duplicates().to_csv(
+                'Space Flight Fans.csv',
+                index=False)
+            end_time = time.time() - start_time
+            del self.ARTICLES_URLS_W_KEY_WORDS, self.article_links
+            gc.collect()
+            print(f'Execution time: {end_time} seconds')
