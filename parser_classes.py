@@ -377,13 +377,11 @@ class SpaceFlightsFansParser:
             del main_page_soup, last_page
 
             start_time = time.time()
-            #asyncio.run(self.__load_articles_for_pages())
-            asyncio.get_event_loop().run_until_complete(self.__load_articles_for_pages())
+            asyncio.run(self.__load_articles_for_pages())
             del self.pages_links
             gc.collect()
             print('|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||')
-            #asyncio.run(self.__load_articles_with_key_words(key_words_string))
-            asyncio.get_event_loop().run_until_complete(self.__load_articles_with_key_words(key_words_string))
+            asyncio.run(self.__load_articles_with_key_words(key_words_string))
 
             pd.DataFrame(self.ARTICLES_URLS_W_KEY_WORDS, columns=['url']).drop_duplicates().to_csv(
                 'Space Flight Fans.csv',
