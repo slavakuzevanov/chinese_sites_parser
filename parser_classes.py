@@ -470,7 +470,7 @@ class sipprParser:
 
             start_time = time.time()
             loop = asyncio.get_event_loop()
-
+            asyncio.set_event_loop(loop)
             loop.run_until_complete(self.__load_articles_for_pages())
             del self.pages_links
             print('|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||')
@@ -643,6 +643,7 @@ class TiebaBaiduParser:
                 self.SECTIONS_DICT_W_KEY_WORDS[section_url] = []
 
         loop = asyncio.get_event_loop()
+        asyncio.set_event_loop(loop)
         loop.run_until_complete(self.fetch_pages_for_all_sections(loop, self.all_categories_links, 0.1))
         print('||||||||||||||||||||||||||||||')
         loop.run_until_complete(self.fetch_articles_for_all_pages(loop, self.all_categories_links, 0.1))
