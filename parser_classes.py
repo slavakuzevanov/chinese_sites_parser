@@ -469,7 +469,7 @@ class sipprParser:
             del main_page_soup, last_page
 
             start_time = time.time()
-            loop = asyncio.get_event_loop()
+            loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             loop.run_until_complete(self.__load_articles_for_pages())
             del self.pages_links
@@ -642,7 +642,7 @@ class TiebaBaiduParser:
                 self.SECTIONS_PAGES_DICT[section_url] = []
                 self.SECTIONS_DICT_W_KEY_WORDS[section_url] = []
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         loop.run_until_complete(self.fetch_pages_for_all_sections(loop, self.all_categories_links, 0.1))
         print('||||||||||||||||||||||||||||||')
