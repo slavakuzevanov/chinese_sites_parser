@@ -390,3 +390,267 @@ class SpaceFlightsFansParser:
             del self.ARTICLES_URLS_W_KEY_WORDS, self.article_links
             gc.collect()
             print(f'Execution time: {end_time} seconds')
+
+
+class sipprParser:
+    def __init__(self):
+        self.article_links = set()
+        self.pages_links = []
+        self.ARTICLES_URLS_W_KEY_WORDS = []
+        self.URL = 'http://www.sippr.cn/xwzx/gsdt/'
+
+    def __create_full_link(self, start_url, list_of_links):
+        return [urllib.parse.urljoin(start_url, link) for link in list_of_links]
+
+    async def __get_soup_by_url(self, url, session, headers):
+        try:
+            async with session.get(url, headers=headers) as response:
+                response_text = await response.text()
+                print(url, 'OK 1')
+                soup = BeautifulSoup(response_text, 'lxml')
+                return soup
+        except Exception as e:
+            print(url, 'ERROR 1')
+            return BeautifulSoup('', 'lxml')
+
+    async def __get_articles_for_page(self, page_link, session, headers):
+        page_soup = await self.__get_soup_by_url(page_link, session, headers)
+        page_articles = page_soup.find_all('div', attrs={"class": "newsR"})
+        page_article_links = [article.find('a')['href'] for article in page_articles]
+        page_article_links = self.__create_full_link(page_link, page_article_links)
+        self.article_links = self.article_links.union(page_article_links)
+        return page_article_links
+
+    async def __load_articles_for_pages(self):
+        async with aiohttp.ClientSession() as session:
+            tasks = []
+            for page_link in self.pages_links:
+                task = asyncio.create_task(
+                    self.__get_articles_for_page(page_link, session, {'User-Agent': str(ua.random)}))
+                tasks.append(task)
+            await asyncio.gather(*tasks)
+
+    async def __find_article_with_key_words(self, session, article, key_words_string):
+        try:
+            async with session.get(article, headers={'User-Agent': str(ua.random)}) as resp:
+                resp_text = await resp.text()
+                print(article, 'OK 2')
+                if re.search(key_words_string, resp_text):
+                    print(f'found key words in {article}')
+                    self.ARTICLES_URLS_W_KEY_WORDS.append(article)
+        except:
+            print(article, 'ERROR 2')
+
+    async def __load_articles_with_key_words(self, key_words_string):
+        async with aiohttp.ClientSession() as session:
+            tasks = []
+            for article in self.article_links:
+                task = asyncio.create_task(
+                    self.__find_article_with_key_words(session, article, key_words_string))
+                tasks.append(task)
+            await asyncio.gather(*tasks)
+
+    def run(self, key_words_string):
+
+        with requests.Session() as s:
+            # Получаю разметку главной страницы
+            main_page = s.get(self.URL, headers={'User-Agent': str(ua.random)})
+            main_page.encoding = main_page.apparent_encoding
+            main_page_soup = BeautifulSoup(main_page.text, 'lxml')
+            #del main_page
+
+            # Получаю цифру последней страницы (здесь в навигации последняя страница идет как 8 тэг <p>)
+            last_page = re.search(r'var countPage = ([0-9]*)', main_page.text).group(1)
+            print('Цифра последней страницы (должна быть 100): ', last_page)
+            all_sections_links = [f'http://www.sippr.cn/xwzx/gsdt/index_{i}.html' for i
+                                  in range(1, int(last_page))]
+            self.pages_links = self.__create_full_link(self.URL, all_sections_links)
+            self.pages_links.append('http://www.sippr.cn/xwzx/gsdt/')
+            del main_page_soup, last_page
+
+            start_time = time.time()
+            loop = asyncio.get_event_loop()
+
+            loop.run_until_complete(self.__load_articles_for_pages())
+            del self.pages_links
+            print('|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||')
+            loop.run_until_complete(self.__load_articles_with_key_words(key_words_string))
+
+            loop.close()
+            pd.DataFrame(self.ARTICLES_URLS_W_KEY_WORDS, columns=['url']).drop_duplicates().to_csv(
+                'SIPPR.csv',
+                index=False)
+            end_time = time.time() - start_time
+            del self.ARTICLES_URLS_W_KEY_WORDS, self.article_links
+            print(f'Execution time: {end_time} seconds')
+
+
+class TiebaBaiduParser:
+    def __init__(self):
+        self.URL = 'https://tieba.baidu.com'
+
+        self.HEADERS = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36'
+        }
+
+        self.all_categories_links = []
+        self.SECTIONS_PAGES_DICT = dict()
+        self.SECTIONS_DICT = dict()
+        self.SECTIONS_DICT_W_KEY_WORDS = dict()
+        self.ARTICLES_URLS = []
+        self.next_delay = 0.1
+        self.active_calls = 0
+        self.MAX_CALLS = 10
+
+    def __create_full_link(self, start_url, list_of_links):
+        return [urllib.parse.urljoin(start_url, link) for link in list_of_links]
+
+    async def fetch_pages_for_all_sections(self, loop, urls, delay):
+        event = asyncio.Event()
+        event.set()
+        results = await asyncio.gather(*[self.fetch_pages_for_section(loop, url, delay, event) for url in urls], return_exceptions=True)
+        return results
+
+    async def fetch_pages_for_section(self, loop, section_url, delay, cond):
+        self.active_calls += 1
+        print('active calls: ', self.active_calls)
+
+        await cond.wait()
+
+        self.next_delay += delay
+        await asyncio.sleep(self.next_delay)
+        try:
+            async with aiohttp.ClientSession(loop=loop) as session:
+                async with session.get(section_url) as resp:
+                    print("An api call to ", section_url, " is made at ", time.time())
+                    #print(resp)
+                    response_text = await resp.text()
+                    response_soup = BeautifulSoup(response_text, 'lxml')
+                    try:
+                        #print(response_soup.prettify())
+                        last_page_link = response_soup.find('a', attrs={'class': 'last'})['href']
+                        print('last_page_link: ', last_page_link)
+                        last_page_link_prefix = re.search(r'(\S*pn=)([0-9]*)', last_page_link).group(1)
+                        last_page = re.search(r'(\S*pn=)([0-9]*)', last_page_link).group(2)
+                        print('last_page: ', last_page)
+                        pages_links_for_category = [last_page_link_prefix + str(i) for i in
+                                                    range(1, int(last_page) + 1)]
+                    except Exception as e:
+                        print(e)
+                        pages_links_for_category = [section_url]
+
+                    full_pages_links_for_category = self.__create_full_link(section_url, pages_links_for_category)
+                    # print(section_url)
+                    self.SECTIONS_PAGES_DICT[section_url] = full_pages_links_for_category
+                    return full_pages_links_for_category
+
+        finally:
+            self.active_calls -= 1
+            print(self.active_calls)
+            if self.active_calls == 0:
+                cond.set()
+
+    async def fetch_articles_for_all_pages(self, loop, urls, delay):
+        event = asyncio.Event()
+        event.set()
+        results = await asyncio.gather(*[self.fetch_articles_for_page_in_section(loop, url, delay, event) for url in urls], return_exceptions=True)
+        return results
+
+    async def fetch_articles_for_page_in_section(self, loop, section_url, delay, cond):
+        self.active_calls += 1
+        print('active calls: ', self.active_calls)
+
+        await cond.wait()
+
+        self.next_delay += delay
+        await asyncio.sleep(self.next_delay)
+        try:
+            async with aiohttp.ClientSession(loop=loop) as session:
+                async with session.get(section_url) as resp:
+                    response_text = await resp.text()
+                    page_soup = BeautifulSoup(response_text, 'lxml')
+                    page_article_links = [tag.find('a')['href'] for tag in
+                                          page_soup.find_all('div', attrs={'class': 'ba_info'})]
+                    print('page_article_links: ', page_article_links)
+                    full_page_article_links = self.__create_full_link(self.URL, page_article_links)
+                    self.SECTIONS_DICT[section_url] = self.SECTIONS_DICT[section_url].union(full_page_article_links)
+        except Exception as e:
+            print(e)
+
+        finally:
+            self.active_calls -= 1
+            print(self.active_calls)
+            if self.active_calls == 0:
+                cond.set()
+
+    async def fetch_all_articles_with_key_words(self, loop, section_urls, delay, key_words_string):
+        event = asyncio.Event()
+        event.set()
+        all_articles = []
+        for section_url in section_urls:
+            all_articles.extend(self.SECTIONS_DICT[section_url])
+        results = await asyncio.gather(*[self.fetch_articles_with_key_words(loop, article, delay, event, key_words_string) for article in all_articles], return_exceptions=True)
+        return results
+
+    async def fetch_articles_with_key_words(self, loop, article, delay, cond, key_words_string):
+        self.active_calls += 1
+        print('active calls: ', self.active_calls)
+
+        await cond.wait()
+
+        self.next_delay += delay
+        await asyncio.sleep(self.next_delay)
+        try:
+            async with aiohttp.ClientSession(loop=loop) as session:
+                async with session.get(article) as resp:
+                    resp_text = await resp.text()
+                    if re.search(key_words_string, resp_text):
+                        print(f'found key words in {article}')
+                        self.ARTICLES_URLS.append(article)
+        except Exception as e:
+            print(e)
+
+        finally:
+            self.active_calls -= 1
+            print(self.active_calls)
+            if self.active_calls == 0:
+                cond.set()
+
+
+
+    def run(self, key_words_string):
+
+        with requests.Session() as s:
+            # Получаю разметку страницы со всеми категориями
+            main_page = s.get('http://tieba.baidu.com/f/index/forumclass', headers=self.HEADERS)
+            main_page.encoding = main_page.apparent_encoding
+            main_page_soup = BeautifulSoup(main_page.text, 'lxml')
+
+            # Получаю html разметку второго меню главной страницы (Центр новостей) и получаю полные ссылки на секции
+            all_classes_list = main_page_soup.find_all('div', attrs={'class': 'class-item'})
+            self.all_categories_links = []
+            for classes_list in all_classes_list:
+                self.all_categories_links.extend(classes_list.find_all('a'))
+            self.all_categories_links = [tag['href'] for tag in self.all_categories_links]
+            print('all_categories_links:')
+            print(self.all_categories_links)
+            self.all_categories_links = self.__create_full_link(self.URL, self.all_categories_links)
+            print(len(self.all_categories_links))
+
+            for section_url in self.all_categories_links:
+                self.SECTIONS_DICT[section_url] = set()
+                self.SECTIONS_PAGES_DICT[section_url] = []
+                self.SECTIONS_DICT_W_KEY_WORDS[section_url] = []
+
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(self.fetch_pages_for_all_sections(loop, self.all_categories_links, 0.1))
+        print('||||||||||||||||||||||||||||||')
+        loop.run_until_complete(self.fetch_articles_for_all_pages(loop, self.all_categories_links, 0.1))
+        print('//////////////////////////////////')
+        loop.run_until_complete(self.fetch_all_articles_with_key_words(loop, self.all_categories_links, 0.1, key_words_string))
+        loop.close()
+        pd.DataFrame(self.ARTICLES_URLS, columns=['url']).drop_duplicates().to_csv(
+            'Tieba Baidu.csv',
+            index=False)
+        del self.SECTIONS_DICT, self.SECTIONS_PAGES_DICT, self.SECTIONS_DICT_W_KEY_WORDS, self.ARTICLES_URLS
+        gc.collect()

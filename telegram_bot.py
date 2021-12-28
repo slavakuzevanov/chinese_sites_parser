@@ -8,7 +8,7 @@ import pymysql
 import telebot
 from telebot import types
 
-from parser_classes import SpaceChinaParser, jqkaParser, SpaceFlightsFansParser
+from parser_classes import SpaceChinaParser, jqkaParser, SpaceFlightsFansParser, sipprParser, TiebaBaiduParser
 
 
 # def display_top(snapshot, key_type='lineno', limit=10):
@@ -48,7 +48,8 @@ VIEW_KEY_WORDS = 101
 VIEW_MEMORY_USAGE = 102
 
 SITES_PARSERS = {'China Aerospace Science and Technology Corporation': SpaceChinaParser,
-                 'Space Flight Fans': SpaceFlightsFansParser, '10jqka': jqkaParser}
+                 'Space Flight Fans': SpaceFlightsFansParser, '10jqka': jqkaParser,
+                 'SIPPR': sipprParser, 'Tieba Baidu': TiebaBaiduParser}
 OPTION_BUTTONS = {'ADD NEW KEY WORD': WORDS, 'CHOOSE SITE TO PARSE': PARSER_CHOOSE,
                   'VIEW KEY WORDS': VIEW_KEY_WORDS, 'DELETE ALL KEY WORDS': DELETE_KEY_WORDS,
                   'VIEW MEMORY USAGE': VIEW_MEMORY_USAGE}
