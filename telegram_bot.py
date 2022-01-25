@@ -11,7 +11,7 @@ from parser_classes import SpaceChinaParser, jqkaParser, SpaceFlightsFansParser,
 DB_USER = <DB_USER>
 DB_PASSWORD = <DB_PASSWORD>
 DB_HOST = <DB_HOST>
-DB_LINK = <DB_LINK>
+DB_NAME = < DB_NAME >
 
 
 def create_r_search_string(list_of_key_words):
@@ -40,7 +40,7 @@ def create_new_user(message):
     try:
         cnx = pymysql.connect(user=DB_USER, password=DB_PASSWORD,
                               host=DB_HOST,
-                              database=DB_LINK)
+                              database=DB_NAME)
         cursor = cnx.cursor()
         add_user = ("INSERT INTO user"
                     "(id, state, insert_date, change_date)"
@@ -60,7 +60,7 @@ def get_state(message):
     try:
         cnx = pymysql.connect(user=DB_USER, password=DB_PASSWORD,
                               host=DB_HOST,
-                              database=DB_LINK)
+                              database=DB_NAME)
         cursor = cnx.cursor()
         query = "SELECT * FROM user WHERE id=%s"
         id = message.chat.id
@@ -77,7 +77,7 @@ def update_state(message, state):
     try:
         cnx = pymysql.connect(user=DB_USER, password=DB_PASSWORD,
                               host=DB_HOST,
-                              database=DB_LINK)
+                              database=DB_NAME)
         cursor = cnx.cursor()
         id = message.chat.id
         query = "UPDATE user SET state = %s, change_date = %s WHERE id = %s"
@@ -94,7 +94,7 @@ def update_state_after_crash():
     try:
         cnx = pymysql.connect(user=DB_USER, password=DB_PASSWORD,
                               host=DB_HOST,
-                              database=DB_LINK)
+                              database=DB_NAME)
         cursor = cnx.cursor()
         query = "UPDATE user SET state = %s, change_date = %s"
         values = (START, datetime.datetime.now())
@@ -110,7 +110,7 @@ def get_users_chat_id_after_crash():
     try:
         cnx = pymysql.connect(user=DB_USER, password=DB_PASSWORD,
                               host=DB_HOST,
-                              database=DB_LINK)
+                              database=DB_NAME)
         cursor = cnx.cursor()
         query = "SELECT id from user where state = %s"
         values = PARSING_IN_PROGRESS
@@ -129,7 +129,7 @@ def add_key_word_for_user(message, key_word: str):
     try:
         cnx = pymysql.connect(user=DB_USER, password=DB_PASSWORD,
                               host=DB_HOST,
-                              database=DB_LINK)
+                              database=DB_NAME)
         cursor = cnx.cursor()
         add_user = ("INSERT INTO user_key_word"
                     "(user_id, key_word, insert_date)"
@@ -149,7 +149,7 @@ def list_current_key_words(message):
     try:
         cnx = pymysql.connect(user=DB_USER, password=DB_PASSWORD,
                               host=DB_HOST,
-                              database=DB_LINK)
+                              database=DB_NAME)
 
         cursor = cnx.cursor()
         query = 'SELECT key_word FROM user_key_word WHERE user_id = %s ORDER BY insert_date ASC'
@@ -168,7 +168,7 @@ def list_current_key_words(message):
 def delete_users_key_words(message):
     cnx = pymysql.connect(user=DB_USER, password=DB_PASSWORD,
                           host=DB_HOST,
-                          database=DB_LINK)
+                          database=DB_NAME)
 
     cursor = cnx.cursor()
 
