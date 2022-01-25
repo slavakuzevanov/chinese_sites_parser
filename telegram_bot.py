@@ -1,6 +1,4 @@
 import gc
-#import linecache
-#import tracemalloc
 import datetime
 import os
 import psutil
@@ -10,38 +8,17 @@ from telebot import types
 
 from parser_classes import SpaceChinaParser, jqkaParser, SpaceFlightsFansParser, sipprParser, TiebaBaiduParser
 
-
-# def display_top(snapshot, key_type='lineno', limit=10):
-#     snapshot = snapshot.filter_traces((
-#         tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
-#         tracemalloc.Filter(False, "<unknown>"),
-#     ))
-#     top_stats = snapshot.statistics(key_type)
-#
-#     print("Top %s lines" % limit)
-#     for index, stat in enumerate(top_stats[:limit], 1):
-#         frame = stat.traceback[0]
-#         print("#%s: %s:%s: %.1f KiB"
-#               % (index, frame.filename, frame.lineno, stat.size / 1024))
-#         line = linecache.getline(frame.filename, frame.lineno).strip()
-#         if line:
-#             print('    %s' % line)
-#
-#     other = top_stats[limit:]
-#     if other:
-#         size = sum(stat.size for stat in other)
-#         print("%s other: %.1f KiB" % (len(other), size / 1024))
-#     total = sum(stat.size for stat in top_stats)
-#     print("Total allocated size: %.1f KiB" % (total / 1024))
-#
-# tracemalloc.start()
+DB_USER = <DB_USER>
+DB_PASSWORD = <DB_PASSWORD>
+DB_HOST = <DB_HOST>
+DB_LINK = <DB_LINK>
 
 
 def create_r_search_string(list_of_key_words):
     return r'|'.join(map(lambda x: f"({x})", list_of_key_words))
 
 
-token = '2082431691:AAFdurqPgFXTnFU-NprqxkcpAtbV-ZggU7U'
+token = <telegram_bot_token>
 START, WORDS, PARSER_CHOOSE, PARSING_IN_PROGRESS = range(4)
 DELETE_KEY_WORDS = 100
 VIEW_KEY_WORDS = 101
@@ -61,9 +38,9 @@ def create_r_search_string(list_of_key_words):
 
 def create_new_user(message):
     try:
-        cnx = pymysql.connect(user='bb5f1b503fb8af', password='cea159a5',
-                              host='eu-cdbr-west-01.cleardb.com',
-                              database='heroku_4aa2fecd059c356')
+        cnx = pymysql.connect(user=DB_USER, password=DB_PASSWORD,
+                              host=DB_HOST,
+                              database=DB_LINK)
         cursor = cnx.cursor()
         add_user = ("INSERT INTO user"
                     "(id, state, insert_date, change_date)"
@@ -81,9 +58,9 @@ def create_new_user(message):
 
 def get_state(message):
     try:
-        cnx = pymysql.connect(user='bb5f1b503fb8af', password='cea159a5',
-                              host='eu-cdbr-west-01.cleardb.com',
-                              database='heroku_4aa2fecd059c356')
+        cnx = pymysql.connect(user=DB_USER, password=DB_PASSWORD,
+                              host=DB_HOST,
+                              database=DB_LINK)
         cursor = cnx.cursor()
         query = "SELECT * FROM user WHERE id=%s"
         id = message.chat.id
@@ -98,9 +75,9 @@ def get_state(message):
 
 def update_state(message, state):
     try:
-        cnx = pymysql.connect(user='bb5f1b503fb8af', password='cea159a5',
-                              host='eu-cdbr-west-01.cleardb.com',
-                              database='heroku_4aa2fecd059c356')
+        cnx = pymysql.connect(user=DB_USER, password=DB_PASSWORD,
+                              host=DB_HOST,
+                              database=DB_LINK)
         cursor = cnx.cursor()
         id = message.chat.id
         query = "UPDATE user SET state = %s, change_date = %s WHERE id = %s"
@@ -115,9 +92,9 @@ def update_state(message, state):
 
 def update_state_after_crash():
     try:
-        cnx = pymysql.connect(user='bb5f1b503fb8af', password='cea159a5',
-                              host='eu-cdbr-west-01.cleardb.com',
-                              database='heroku_4aa2fecd059c356')
+        cnx = pymysql.connect(user=DB_USER, password=DB_PASSWORD,
+                              host=DB_HOST,
+                              database=DB_LINK)
         cursor = cnx.cursor()
         query = "UPDATE user SET state = %s, change_date = %s"
         values = (START, datetime.datetime.now())
@@ -131,9 +108,9 @@ def update_state_after_crash():
 
 def get_users_chat_id_after_crash():
     try:
-        cnx = pymysql.connect(user='bb5f1b503fb8af', password='cea159a5',
-                              host='eu-cdbr-west-01.cleardb.com',
-                              database='heroku_4aa2fecd059c356')
+        cnx = pymysql.connect(user=DB_USER, password=DB_PASSWORD,
+                              host=DB_HOST,
+                              database=DB_LINK)
         cursor = cnx.cursor()
         query = "SELECT id from user where state = %s"
         values = PARSING_IN_PROGRESS
@@ -150,9 +127,9 @@ def get_users_chat_id_after_crash():
 
 def add_key_word_for_user(message, key_word: str):
     try:
-        cnx = pymysql.connect(user='bb5f1b503fb8af', password='cea159a5',
-                              host='eu-cdbr-west-01.cleardb.com',
-                              database='heroku_4aa2fecd059c356')
+        cnx = pymysql.connect(user=DB_USER, password=DB_PASSWORD,
+                              host=DB_HOST,
+                              database=DB_LINK)
         cursor = cnx.cursor()
         add_user = ("INSERT INTO user_key_word"
                     "(user_id, key_word, insert_date)"
@@ -170,9 +147,9 @@ def add_key_word_for_user(message, key_word: str):
 
 def list_current_key_words(message):
     try:
-        cnx = pymysql.connect(user='bb5f1b503fb8af', password='cea159a5',
-                              host='eu-cdbr-west-01.cleardb.com',
-                              database='heroku_4aa2fecd059c356')
+        cnx = pymysql.connect(user=DB_USER, password=DB_PASSWORD,
+                              host=DB_HOST,
+                              database=DB_LINK)
 
         cursor = cnx.cursor()
         query = 'SELECT key_word FROM user_key_word WHERE user_id = %s ORDER BY insert_date ASC'
@@ -189,9 +166,9 @@ def list_current_key_words(message):
 
 
 def delete_users_key_words(message):
-    cnx = pymysql.connect(user='bb5f1b503fb8af', password='cea159a5',
-                          host='eu-cdbr-west-01.cleardb.com',
-                          database='heroku_4aa2fecd059c356')
+    cnx = pymysql.connect(user=DB_USER, password=DB_PASSWORD,
+                          host=DB_HOST,
+                          database=DB_LINK)
 
     cursor = cnx.cursor()
 
@@ -203,8 +180,6 @@ def delete_users_key_words(message):
     cursor.close()
     cnx.close()
 
-
-#USER_STATE = defaultdict(lambda: START)
 
 bot = telebot.TeleBot(token)
 
@@ -262,14 +237,7 @@ def options_callback_handler(callback_query):
         update_state(message, WORDS)
     elif int(text) == VIEW_MEMORY_USAGE:
         process = psutil.Process(os.getpid())
-        #current_snapshot = tracemalloc.take_snapshot()
-        # top_stats = current_snapshot.compare_to(first_snapshot, 'lineno')
-        # top_10 = ''
-        # for stat in top_stats[:20]:
-        #     top_10 += str(stat) + '\n'
         bot.send_message(message.chat.id, text=f'{process.memory_info().rss / (1024 ** 2)} MB')
-        # bot.send_message(message.chat.id, text=f'''TOP10 \n{top_10}''')
-        # print(display_top(current_snapshot, limit=20))
 
     elif current_state in [START, WORDS, PARSER_CHOOSE] and int(text) == PARSER_CHOOSE:
         key_words = list_current_key_words(message)
@@ -351,7 +319,6 @@ def sites_callback_handler(callback_query):
         bot.send_message(message.chat.id, text='Try CHOOSE SITE TO PARSE command first')
 
 
-#first_snapshot = tracemalloc.take_snapshot()
 user_id_after_crash = get_users_chat_id_after_crash()
 for chat_id in user_id_after_crash:
     bot.send_message(chat_id, text='We are sorry. We had to restart the bot. Try running your parser again.')
